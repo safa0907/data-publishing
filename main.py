@@ -131,26 +131,26 @@ def add_or_append_sublayers(gis, geojson_path, service_id):
     return sublayer_name
 
 
-def create_view(feature_service, view_name, filter):
-    print(f"Creating/ updating view {view_name} with filter: {filter}")
-    try:
-        existing_views = feature_service.layers[0].views
-        view_item = None
-        for view in existing_views:
-            if view.properties.name == view_name:
-                view_item = view
-                break
-        if view_item:
-            print(f"View '{view_name}' exists.")
-            view_item.manager.update_definition({'definitionExpression': filter})
-        else:
-            print(f"View {view_name} does not exist. Creating a new view...")
-            view_item = feature_service.layers[0].create_view(view_name, definition_expression=filter)
-            print(f"View {view_name} is created.")
-        return view_item
-    except Exception as e:
-        print(f"Error creating view {view_name}:{e}")
-        return None
+# def create_view(feature_service, view_name, filter):
+#     print(f"Creating/ updating view {view_name} with filter: {filter}")
+#     try:
+#         existing_views = feature_service.layers[0].views
+#         view_item = None
+#         for view in existing_views:
+#             if view.properties.name == view_name:
+#                 view_item = view
+#                 break
+#         if view_item:
+#             print(f"View '{view_name}' exists.")
+#             view_item.manager.update_definition({'definitionExpression': filter})
+#         else:
+#             print(f"View {view_name} does not exist. Creating a new view...")
+#             view_item = feature_service.layers[0].create_view(view_name, definition_expression=filter)
+#             print(f"View {view_name} is created.")
+#         return view_item
+#     except Exception as e:
+#         print(f"Error creating view {view_name}:{e}")
+#         return None
 
 
 def create_dashboards(gis, client, view_item, dashboard_title):
@@ -182,7 +182,6 @@ def create_dashboards(gis, client, view_item, dashboard_title):
 
 
 def main():
-    global feature_service
     print("AGOL authentication...")
     gis = "gis-connection"
     s3 = boto3.client('s3')
@@ -210,36 +209,41 @@ def main():
     # Create views
     for client, config in client_config.items():
         print(f"{client}...")
+        existing_views = gis.content.search(config['view_name'])[0]
+        view_item = None
+        for view in existing_views:
+            if view.properties.name == config['view_name']:
+                view_item = view
+                break
         if client == 'ClientA':  # Europe and North America all years
-            view_item_a = flood_layer_collection.manager.create_view(name="view_testA", view_layers=[
+            view_item_a = flood_layer_collection.manager.create_view(name=config['view_name'], view_layers=[
                 flood_layer_collection.layers[0:len(sublayers) + 1]])
-            location_filter = "location in ('Europe','North America')"
+            # location_filter = "location in ('Europe','North America')"
             for i in range(len(sublayers) + 1):
                 view_a_layer = view_item_a.layers[i]
-                view_a_layer.manager.update_definition({"viewDefinitionQuery": location_filter})
-
-        elif client == 'ClientB':  # Global only year 2022 to 2024
+                view_a_layer.manager.update_definition({"viewDefinitionQuery": config['filter']})
+            view = view_item_a
+        elif client == 'ClientB':  # Global, only for years 2022 to 2024
             list_index_sublayers = []
             for i, sublayer in enumerate(sublayers):
                 sublayer_name = sublayer.properties.name
                 if any(year in sublayer_name for year in ('2022', '2023', '2024')):
                     list_index_sublayers.append(i)
 
-            view_item_b = flood_layer_collection.manager.create_view(name="view_testB",
+            view_item_b = flood_layer_collection.manager.create_view(name=config['view_name'],
                                                                      view_layers=[flood_layer_collection.layers[i] for i
                                                                                   in list_index_sublayers])
             # services = [fs for year, fs in feature_services.items() if 2022 <= int(year) <= 2024]
-
+            view = view_item_b
         else:
-            services = []
-        for fs in services:
-            view_item = create_view(fs, config['view_name'], config['filter'])
+            view = []
+        if view:
             # Create dashboards
-            if view_item:
-                dashboard = create_dashboards(gis=gis, client=client, view_item=view_item,
-                                              dashboard_title=config['dashboard_title'])
-                if dashboard:
-                    print(f"Dashboard for client {client}: {dashboard.url}")
+            dashboard = create_dashboards(gis=gis, client=client, view_item=view,
+                                          dashboard_title=config['dashboard_title'])
+            if dashboard:
+                print(f"Dashboard for client {client}: {dashboard.url}")
+
 
 if __name__ == "__main__":
     main()
