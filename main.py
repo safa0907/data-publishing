@@ -181,7 +181,14 @@ def create_dashboards(gis, client, view_item, dashboard_title):
         return None
 
 
-def main():
+def share_with_group(gis, item, group_id):
+    # share with group
+    group_id = f'{group_id}'  # Group ID
+    group = gis.groups.get(group_id)  # Group Item
+    item(groups=[group])
+
+
+def main(group_id=None):
     print("AGOL authentication...")
     gis = "gis-connection"
     s3 = boto3.client('s3')
@@ -194,14 +201,11 @@ def main():
             # Access geojson filtered
             # geojson_path = "s3://flood-data-bucket/flood_data_year.geojson"
             geojson_path = file_key
-            # filename = "flood_data_year.geojson"
             # Publish feature service
-            # feature_services = {}
             try:
                 # year = extract_year_from_filename(geojson_path)
                 service_name = f"Flood_Data"
                 feature_service = publish_or_update_feature_service(gis, geojson_path, service_name)
-                # feature_services[year] = feature_service
             except Exception as e:
                 print(f"Error: {e}")
     flood_layer_collection = FeatureLayerCollection.fromitem(feature_service)
@@ -223,6 +227,7 @@ def main():
                 view_a_layer = view_item_a.layers[i]
                 view_a_layer.manager.update_definition({"viewDefinitionQuery": config['filter']})
             view = view_item_a
+            share_with_group(gis, view, group_id)
         elif client == 'ClientB':  # Global, only for years 2022 to 2024
             list_index_sublayers = []
             for i, sublayer in enumerate(sublayers):
@@ -235,6 +240,7 @@ def main():
                                                                                   in list_index_sublayers])
             # services = [fs for year, fs in feature_services.items() if 2022 <= int(year) <= 2024]
             view = view_item_b
+            share_with_group(gis, view, group_id)
         else:
             view = []
         if view:
@@ -242,6 +248,7 @@ def main():
             dashboard = create_dashboards(gis=gis, client=client, view_item=view,
                                           dashboard_title=config['dashboard_title'])
             if dashboard:
+                share_with_group(gis, dashboard, group_id)
                 print(f"Dashboard for client {client}: {dashboard.url}")
 
 
