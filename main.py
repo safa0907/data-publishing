@@ -241,6 +241,5 @@ def main():
                 if dashboard:
                     print(f"Dashboard for client {client}: {dashboard.url}")
 
-
 if __name__ == "__main__":
     main()
